@@ -2153,12 +2153,16 @@ public class IndexWriter
             }
           }
 
+          //TODO: atri
+          /*
           if (maxNumSegmentsMergesPending()) {
             testPoint("forceMergeBeforeWait");
             doWait();
           } else {
             break;
-          }
+          }*/
+          //TODO: atri
+          break;
         }
       }
 

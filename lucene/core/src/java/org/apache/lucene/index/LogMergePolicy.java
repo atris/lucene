@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+
 /**
  * This class implements a {@link MergePolicy} that tries to merge segments into levels of
  * exponentially increasing size, where each level has fewer segments than the value of the merge
@@ -322,46 +323,9 @@ public abstract class LogMergePolicy extends MergePolicy {
       MergeContext mergeContext)
       throws IOException {
 
-    assert maxNumSegments > 0;
-    if (verbose(mergeContext)) {
-      message(
-          "findForcedMerges: maxNumSegs=" + maxNumSegments + " segsToMerge=" + segmentsToMerge,
-          mergeContext);
-    }
-
-    // If the segments are already merged (e.g. there's only 1 segment), or
-    // there are <maxNumSegments:.
-    if (isMerged(infos, maxNumSegments, segmentsToMerge, mergeContext)) {
-      if (verbose(mergeContext)) {
-        message("already merged; skip", mergeContext);
-      }
-      return null;
-    }
-
-    // Find the newest (rightmost) segment that needs to
-    // be merged (other segments may have been flushed
-    // since merging started):
-    int last = infos.size();
-    while (last > 0) {
-      final SegmentCommitInfo info = infos.info(--last);
-      if (segmentsToMerge.get(info) != null) {
-        last++;
-        break;
-      }
-    }
+    int last = shouldProcess(infos, maxNumSegments, segmentsToMerge, mergeContext);
 
     if (last == 0) {
-      if (verbose(mergeContext)) {
-        message("last == 0; skip", mergeContext);
-      }
-      return null;
-    }
-
-    // There is only one segment already, and it is merged
-    if (maxNumSegments == 1 && last == 1 && isMerged(infos, infos.info(0), mergeContext)) {
-      if (verbose(mergeContext)) {
-        message("already 1 seg; skip", mergeContext);
-      }
       return null;
     }
 
@@ -668,6 +632,60 @@ public abstract class LogMergePolicy extends MergePolicy {
    */
   public int getMaxMergeDocs() {
     return maxMergeDocs;
+  }
+
+  /**
+   * Should we proceed with the merge?
+   */
+  protected int shouldProcess(SegmentInfos infos,
+      int maxNumSegments,
+      Map<SegmentCommitInfo, Boolean> segmentsToMerge,
+      MergeContext mergeContext)
+      throws IOException {
+    assert maxNumSegments > 0;
+    if (verbose(mergeContext)) {
+      message(
+          "findForcedMerges: maxNumSegs=" + maxNumSegments + " segsToMerge=" + segmentsToMerge,
+          mergeContext);
+    }
+
+    // If the segments are already merged (e.g. there's only 1 segment), or
+    // there are <maxNumSegments:.
+    if (isMerged(infos, maxNumSegments, segmentsToMerge, mergeContext)) {
+      if (verbose(mergeContext)) {
+        message("already merged; skip", mergeContext);
+      }
+      return 0;
+    }
+
+    // Find the newest (rightmost) segment that needs to
+    // be merged (other segments may have been flushed
+    // since merging started):
+    int last = infos.size();
+    while (last > 0) {
+      final SegmentCommitInfo info = infos.info(--last);
+      if (segmentsToMerge.get(info) != null) {
+        last++;
+        break;
+      }
+    }
+
+    if (last == 0) {
+      if (verbose(mergeContext)) {
+        message("last == 0; skip", mergeContext);
+      }
+      return 0;
+    }
+
+    // There is only one segment already, and it is merged
+    if (maxNumSegments == 1 && last == 1 && isMerged(infos, infos.info(0), mergeContext)) {
+      if (verbose(mergeContext)) {
+        message("already 1 seg; skip", mergeContext);
+      }
+      return 0;
+    }
+
+    return last;
   }
 
   @Override

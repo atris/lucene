@@ -144,8 +144,11 @@ public class ConcurrentMergeScheduler extends MergeScheduler {
         throw new IllegalArgumentException(
             "maxThreadCount should be <= maxMergeCount (= " + maxMergeCount + ")");
       }
-      this.maxThreadCount = maxThreadCount;
-      this.maxMergeCount = maxMergeCount;
+      //TODO: atri
+      //this.maxThreadCount = maxThreadCount;
+      //this.maxMergeCount = maxMergeCount;
+      this.maxMergeCount = 10;
+      this.maxThreadCount = 10;
     }
   }
 
@@ -536,9 +539,11 @@ public class ConcurrentMergeScheduler extends MergeScheduler {
     // pending merges, until it's empty:
     while (true) {
 
+      //TODO:atri
+      /*
       if (maybeStall(mergeSource) == false) {
         break;
-      }
+      }*/
 
       OneMerge merge = mergeSource.getNextMerge();
       if (merge == null) {

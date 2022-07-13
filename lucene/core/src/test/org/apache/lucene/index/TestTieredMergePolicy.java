@@ -928,6 +928,22 @@ public class TestTieredMergePolicy extends BaseMergePolicyTestCase {
 
     TieredMergePolicy mp = new TieredMergePolicy();
 
+    // 1 big segment
+    segmentInfos.add(
+        makeSegmentCommitInfo(
+            "_" + segNameGenerator.getAndIncrement(), 50_000, 0, 0, IndexWriter.SOURCE_MERGE));
+    // 40 segment on a lower tier
+    for (int i = 0; i < 40; ++i) {
+      segmentInfos.add(
+          makeSegmentCommitInfo(
+              "_" + segNameGenerator.getAndIncrement(), 5000, 0, 0, IndexWriter.SOURCE_MERGE));
+    }
+    // 1 big segment again
+    segmentInfos.add(
+        makeSegmentCommitInfo(
+            "_" + segNameGenerator.getAndIncrement(), 50_000, 0, 0, IndexWriter.SOURCE_MERGE));
+    // Ensure that having small segments in the middle doesn't prevent merging
+
     for (int i = 0; i < 11; ++i) {
       segmentInfos.add(
           makeSegmentCommitInfo(
@@ -945,5 +961,125 @@ public class TestTieredMergePolicy extends BaseMergePolicyTestCase {
           applyMerge(segmentInfos, merge, "_" + segNameGenerator.getAndIncrement(), stats);
     }
     assertEquals(2, segmentInfos.size());
+  }
+
+  public void testFoo() throws Exception {
+    final Directory dir = newDirectory();
+    final IndexWriterConfig conf = newIndexWriterConfig(new MockAnalyzer(random()));
+    final TieredMergePolicy tmp = new TieredMergePolicy();
+    final LogMergePolicy lmp = new LogDocMergePolicy();
+    final ConcurrentForceMergeOptimizingMergePolicy cmp = new ConcurrentForceMergeOptimizingMergePolicy();
+
+    tmp.setMaxMergeAtOnceExplicit(25);
+    cmp.setMaxConcurrency(2);
+    //lmp.setMergeFactor(2);
+
+    // Empirically, 100 docs the size below give us segments of 3,330 bytes. It's not all that
+    // reliable in terms
+    // of how big a segment _can_ get, so set it to prevent merges on commit.
+    double mbSize = 0.004;
+    long maxSegBytes =
+        (long)
+            ((1024.0 * 1024.0)); // fudge it up, we're trying to catch egregious errors and segbytes
+    // don't really reflect the number for original merges.
+    tmp.setMaxMergedSegmentMB(mbSize);
+    conf.setMaxBufferedDocs(30);
+    conf.setMergePolicy(tmp);
+    //conf.setMergePolicy(lmp);
+    //conf.setMergePolicy(cmp);
+
+    final IndexWriter w = new IndexWriter(dir, conf);
+
+    final int numDocs = atLeast(100000);
+    for (int j = 0; j < 1; j++) {
+      for (int i = 0; i < numDocs; i++) {
+        Document doc = new Document();
+        doc.add(newStringField("id", "" + i, Field.Store.NO));
+        doc.add(newTextField("content", "aaa " + i, Field.Store.NO));
+        w.addDocument(doc);
+      }
+      w.commit();
+      w.flush();
+    }
+
+    /*for (int j = 0; j < 50; j++) {
+      for (int i = 0; i < 2500; i++) {
+        Document doc = new Document();
+        doc.add(newStringField("id", "" + i, Field.Store.NO));
+        doc.add(newTextField("content", "aaa " + i, Field.Store.NO));
+        w.addDocument(doc);
+      }
+      w.commit();
+      w.flush();
+    }
+
+    for (int j = 0; j < 5; j++) {
+      for (int i = 0; i < numDocs; i++) {
+        Document doc = new Document();
+        doc.add(newStringField("id", "" + i, Field.Store.NO));
+        doc.add(newTextField("content", "aaa " + i, Field.Store.NO));
+        w.addDocument(doc);
+      }
+      w.commit();
+      w.flush();
+    }*/
+
+    //w.commit();
+
+
+    //w.forceMergeDeletes();
+    //checkSegmentsInExpectations(w, segNamesBefore, false); // There should have been no merges.
+
+    System.out.println("STARTING NOW");
+    long start = System.currentTimeMillis();
+    w.forceMerge(1);
+    long end = System.currentTimeMillis();
+    long elapsedTime = end - start;
+    System.out.println("TIME IS " + elapsedTime);
+    // These should be no-ops on an index with no deletions and segments are pretty big.
+    List<String> segNamesBefore = getSegmentNames(w);
+    checkSegmentsInExpectations(w, segNamesBefore, true);
+    checkSegmentSizeNotExceeded(w.cloneSegmentInfos(), maxSegBytes);
+    int i = 0;
+    w.close();
+
+    dir.close();
+  }
+
+  public void testBar() throws Exception {
+    final TieredMergePolicy tmp = new TieredMergePolicy();
+    final LogMergePolicy lmp = new LogDocMergePolicy();
+    final double maxSegmentSize = 10.0D;
+    //tmp.setMaxMergedSegmentMB(maxSegmentSize);
+
+    SegmentInfos infos = new SegmentInfos(Version.LATEST.major);
+
+    for (int j = 0; j < 20; ++j) {
+      infos.add(makeSegmentCommitInfo("_" + j, 50000, 0, 1.0D, IndexWriter.SOURCE_MERGE));
+    }
+
+    for (int j = 0; j < 70; ++j) {
+      infos.add(makeSegmentCommitInfo("_" + j, 5000, 0, 1.0D, IndexWriter.SOURCE_MERGE));
+    }
+
+    for (int j = 0; j < 10; ++j) {
+      infos.add(makeSegmentCommitInfo("_" + j, 50000, 0, 1.0D, IndexWriter.SOURCE_MERGE));
+    }
+
+    for (int j = 0; j < 3; ++j) {
+      infos.add(makeSegmentCommitInfo("_" + j, 5000, 0, 1.0D, IndexWriter.SOURCE_MERGE));
+    }
+
+    final MockMergeContext mergeContext = new MockMergeContext(SegmentCommitInfo::getDelCount);
+    mergeContext.setMergingSegments(Collections.singleton(infos.asList().get(0)));
+    final int expectedCount = 2;
+    final MergeSpecification specification =
+        tmp.findForcedMerges(infos, expectedCount, segmentsToMerge(infos), mergeContext);
+    final MergeSpecification specification2 =
+        lmp.findForcedMerges(infos, expectedCount, segmentsToMerge(infos), mergeContext);
+    // Since we have fewer than 30 (the max merge count) segments more than the final size this
+    // would have been the final merge
+    // so we check that it was prevented.
+    assertNull(specification);
   }
 }

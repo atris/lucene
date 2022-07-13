@@ -124,7 +124,11 @@ public class LiveIndexWriterConfig {
     useCompoundFile = IndexWriterConfig.DEFAULT_USE_COMPOUND_FILE_SYSTEM;
     openMode = OpenMode.CREATE_OR_APPEND;
     similarity = IndexSearcher.getDefaultSimilarity();
-    mergeScheduler = new ConcurrentMergeScheduler();
+    //TODO: atri
+    //mergeScheduler = new ConcurrentMergeScheduler();
+    ConcurrentMergeScheduler concurrentMergeScheduler = new ConcurrentMergeScheduler();
+    concurrentMergeScheduler.setMaxMergesAndThreads(10, 10);
+
     codec = Codec.getDefault();
     if (codec == null) {
       throw new NullPointerException();
