@@ -58,6 +58,13 @@ public class ConcurrentForceMergeOptimizingMergePolicy extends LogMergePolicy {
         spec.add(new OneMerge(currentPartition));
       }
     }
+
+    for (OneMerge merge : merges) {
+      spec.add(merge);
+    }
+
+    //TODO: atri
+    System.out.println("CONCUME " + spec.merges.size());
     return spec;
   }
 

@@ -304,6 +304,10 @@ public abstract class LogMergePolicy extends MergePolicy {
         spec.add(new OneMerge(segments.subList(bestStart, bestStart + finalMergeSize)));
       }
     }
+
+    //TODO: atri
+    System.out.println("LOGMERGE " + spec.merges.size());
+
     return spec.merges.size() == 0 ? null : spec;
   }
 

@@ -2323,6 +2323,9 @@ public class IndexWriter
           : "Expected EXPLICT or MERGE_FINISHED as trigger even with maxNumSegments set but was: "
               + trigger.name();
 
+      //TODO: atri
+      System.out.println("DISTRIB " + segmentInfos.asList().size());
+
       spec =
           mergePolicy.findForcedMerges(
               segmentInfos, maxNumSegments, Collections.unmodifiableMap(segmentsToMerge), this);
